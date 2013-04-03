@@ -7,20 +7,28 @@ Part of Python's docx module - http://github.com/mikemaccana/python-docx
 See LICENSE for licensing information.
 '''
 
-from copy import deepcopy
+
 import logging
+import sys
+import shutil
+import re
+import time
+import os
+import zipfile
+from distutils import dir_util
+from os.path import join
+from copy import deepcopy
+from distutils import dir_util
 from lxml import etree
 try:
     from PIL import Image
 except ImportError:
-    import Image
-import zipfile
-import shutil
-from distutils import dir_util
-import re
-import time
-import os
-from os.path import join
+    try:
+        import Image
+    except ImportError:
+        sys.stderr.write("Can't find module PIL or Image")
+
+
 
 log = logging.getLogger(__name__)
 
@@ -335,7 +343,10 @@ def table(contents, heading=True, colw=None, cwunit='dxa', tblw=0, twunit='auto'
         tableborders = makeelement('tblBorders')
         for b in ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']:
             if b in borders.keys() or 'all' in borders.keys():
-                k = 'all' if 'all' in borders.keys() else b
+                if 'all' in borders.keys():
+                    k = 'all'
+                else:
+                    k = b
                 attrs = {}
                 for a in borders[k].keys():
                     attrs[a] = unicode(borders[k][a])
@@ -348,7 +359,10 @@ def table(contents, heading=True, colw=None, cwunit='dxa', tblw=0, twunit='auto'
     # Table Grid
     tablegrid = makeelement('tblGrid')
     for i in range(columns):
-        tablegrid.append(makeelement('gridCol',attributes={'w':str(colw[i]) if colw else '2390'}))
+        if colw:
+            tablegrid.append(makeelement('gridCol',attributes={'w':str(colw[i])}))
+        else:
+            tablegrid.append(makeelement('gridCol',attributes={'w':'2390'}))
     table.append(tablegrid)
     # Heading Row
     row = makeelement('tr')
@@ -383,7 +397,10 @@ def table(contents, heading=True, colw=None, cwunit='dxa', tblw=0, twunit='auto'
             i += 1
         table.append(row)
     # Contents Rows
-    for contentrow in contents[1 if heading else 0:]:
+    starting_row = 0
+    if heading:
+        starting_row = 1
+    for contentrow in contents[starting_row:]:
         row = makeelement('tr')
         if rowstyle:
             rowprops = makeelement('trPr')
@@ -444,6 +461,12 @@ def picture(relationshiplist, picname, picdescription, pixelwidth=None,
     # Create an image. Size may be specified, otherwise it will based on the
     # pixel size of image. Return a paragraph containing the picture'''
     # Copy the file into the media dir
+    try:
+        Image
+    except Exception:
+        log.error('Cannot find module: Image')
+        raise ImportError
+
     if not template_dir:
         template_dir = TEMP_TEMPLATE_DIR
     media_dir = join(template_dir, 'word', 'media')
